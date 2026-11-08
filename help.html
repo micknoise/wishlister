@@ -27,6 +27,12 @@
   summary { cursor:pointer; font-weight:600; }
   details p { margin: 6px 0 2px; }
   .back { display:inline-block; margin-bottom:14px; }
+  .tag.secret { background:#f3e8f6; color:#7a3d8c; }
+  .tag.warn { background:#fbe9e5; color:var(--accent); }
+  .star { color:#c8900e; }
+  nav.toc { columns:2; column-gap:20px; font-size:.95rem; margin:10px 0 16px; }
+  nav.toc a { display:block; padding:2px 0; }
+  .card { scroll-margin-top:12px; }
 </style>
 </head>
 <body>
@@ -35,9 +41,19 @@
   <h1>How it works</h1>
   <p class="muted">A shared wish list for the family. Everyone keeps their own list,
   and you can mark things you're buying for each other so nobody buys the same present twice.
-  The person whose list it is never finds out what's been bought.</p>
+  The person whose list it is never finds out what's been bought, until they choose to open their presents.</p>
+  <nav class="toc">
+    <a href="#signin">1. Sign in</a>
+    <a href="#add">2. Add things to your list</a>
+    <a href="#buy">3. Buy something for someone</a>
+    <a href="#shopping">4. My shopping</a>
+    <a href="#others">5. Add to someone else's list</a>
+    <a href="#after">6. After the birthday or Christmas</a>
+    <a href="#surprise">Keeping it a surprise</a>
+    <a href="#questions">Questions</a>
+  </nav>
 
-  <div class="card">
+  <div class="card" id="signin">
     <h2>1. Sign in</h2>
     <ol>
       <li>Type your <b>first name</b> and the <b>family code</b> (ask whoever sent you the link).</li>
@@ -47,14 +63,14 @@
     </ol>
   </div>
 
-  <div class="card">
+  <div class="card" id="add">
     <h2>2. Add things to your list</h2>
     <ol>
       <li>Tap <span class="btn">My list</span>.</li>
       <li>Find the thing you want in a shop's website, copy its link, and paste it into the box.
         The name, price and picture usually fill in by themselves after a second or two.</li>
       <li>Check the name and price, and add any <b>notes</b> (size, colour, "any of these", "second-hand is fine").</li>
-      <li>Tick <b><span style="color:#c8900e">★</span> Really want this</b> for favourites (they go to the top), and set
+      <li>Tick <b><span class="star">★</span> Really want this</b> for favourites (they go to the top), and set
         <b>How many?</b> if you'd like more than one, e.g. 2 mugs.</li>
       <li>Tap <span class="btn primary">Add to my list</span>.</li>
     </ol>
@@ -64,35 +80,37 @@
     <p>To change something, tap <span class="btn">Edit</span>. To take it off, tap <span class="btn">Remove</span>.</p>
   </div>
 
-  <div class="card">
+  <div class="card" id="buy">
     <h2>3. Buy something for someone</h2>
     <ol>
-      <li>Tap the person's name along the top to see their list.
-        (A name only appears once that person has added something.)</li>
+      <li>Tap the person's name along the top to see their list. (A name appears once there's
+        something on their list.) Things with a <span class="star">★</span> are the ones they really want.</li>
       <li>Tap the item's name to open the shop.</li>
       <li>When you decide to get it, tap <span class="btn primary">I'll get this</span>.
         It changes to <span class="tag ok">You're getting this</span>, and everyone else sees
-        <span class="tag">Bought by <i>your name</i></span>, so they won't buy it too.</li>
+        <span class="tag"><i>Your name</i> is getting this</span>, so they won't buy it too.</li>
       <li>Changed your mind? Tap <b>undo</b> to free it up again. Only you can undo your own.</li>
-      <li>If they want more than one, the button says <span class="btn primary">I'll get one</span>, so
-        several people can each get one. Tap <b>+1</b> to get another yourself.</li>
+      <li>If they want more than one (it says "wants 2"), the button says <span class="btn primary">I'll get one</span>,
+        so several people can each get one. "1 of 2 taken" shows how many are spoken for, and <b>+1</b> lets you get
+        another yourself while there are still some left.</li>
     </ol>
   </div>
 
-  <div class="card">
+  <div class="card" id="shopping">
     <h2>4. My shopping</h2>
     <p>The <span class="btn">My shopping</span> tab lists everything you've said you'll get, for everyone.
       Tick <b>Bought</b> once you've actually bought it. The red number shows how many are still to buy.</p>
     <p>If someone removes an item you'd said you'd get, it stays here marked
-      <span class="tag warn" style="background:#fbe9e5;color:#b4432f">Removed from the list by …</span>, so you know.
+      <span class="tag warn">Removed from the list by …</span>, so you know (and can decide whether to keep or return it).
       Tap <span class="btn">Take off my shopping</span> once you've dealt with it.</p>
   </div>
 
-  <div class="card">
+  <div class="card" id="others">
     <h2>5. Add to someone else's list</h2>
     <p><b>Secret suggestions.</b> Open someone's list and tap <span class="btn">+ Add something to …'s list</span>.
       "Secret suggestion" is ticked to start with: everyone except that person can see it
-      (e.g. "Mum would love this"). Untick it if they should see it too.</p>
+      (e.g. "Mum would love this"), marked <span class="tag secret">Secret suggestion from <i>you</i></span>.
+      Untick it if they should see it too.</p>
     <p><b>Lists for people who won't use this</b>, like young children or grandparents: tap
       <span class="btn">+ Someone else</span>, type their name, and add things for them. Anyone can then
       buy from it as normal. If they do sign in one day with that name, they'll find their list waiting.</p>
@@ -100,7 +118,7 @@
       which they can't see at all).</p>
   </div>
 
-  <div class="card">
+  <div class="card" id="after">
     <h2>6. After the birthday or Christmas</h2>
     <p>On your own list, tap <span class="btn">🎁 Open my presents</span>. Everything that was bought moves off
       your list into <b>Presents received</b>, showing who each one was from. Things nobody bought stay on your list.
@@ -109,7 +127,7 @@
       afterwards instead.</p>
   </div>
 
-  <div class="card">
+  <div class="card" id="surprise">
     <h2>Keeping it a surprise</h2>
     <p>On your own list you'll never see what's been bought, who's getting it, or any secret suggestions, until you
       tap <b>Open my presents</b>. Everyone else can see all of it, so they can avoid buying the same thing twice.</p>
@@ -117,7 +135,7 @@
       sign in as yourself.</p>
   </div>
 
-  <div class="card">
+  <div class="card" id="questions">
     <h2>Questions</h2>
     <details>
       <summary>The name or picture didn't fill in</summary>
@@ -126,7 +144,8 @@
     </details>
     <details>
       <summary>I don't see changes someone else just made</summary>
-      <p>Tap <span class="btn">Refresh</span> at the top. The page also refreshes when you come back to it.</p>
+      <p>The page catches up whenever you switch tabs or come back to it. You can also tap
+        <span class="btn">Refresh</span> at the top.</p>
     </details>
     <details>
       <summary>I signed in with the wrong name, or I'm on a new phone</summary>
@@ -147,6 +166,15 @@
       <summary>What if I remove something that someone has already bought?</summary>
       <p>You won't be told, so the surprise is safe. The person getting it still sees it in their
         <b>My shopping</b> tab, marked as removed, so they know.</p>
+    </details>
+    <details>
+      <summary>Something on my list says "added by …"</summary>
+      <p>Someone added it to your list for you (not as a secret). You can edit or remove it like anything else.</p>
+    </details>
+    <details>
+      <summary>I tapped "Open my presents" too early</summary>
+      <p>The page can't undo it, and you'll have seen who's getting what. Whoever runs the spreadsheet can put things
+        back by clearing the dates in the <b>archived</b> columns. Please act surprised anyway!</p>
     </details>
     <details>
       <summary>Where is everything kept?</summary>
