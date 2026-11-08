@@ -6,34 +6,46 @@
 <meta name="robots" content="noindex">
 <title>Wish lists</title>
 <style>
-  :root { --bg:#faf8f5; --card:#fff; --ink:#222; --muted:#777; --line:#e6e1da; --accent:#b4432f; --ok:#2f7d4f; }
+  :root { --bg:#faf8f5; --card:#fff; --ink:#222; --muted:#777; --line:#e6e1da; --accent:#b4432f; --ok:#2f7d4f; --gold:#c8900e; }
   * { box-sizing: border-box; }
   body { margin:0; font:16px/1.45 system-ui, -apple-system, Segoe UI, sans-serif; background:var(--bg); color:var(--ink); }
   main { max-width: 760px; margin: 0 auto; padding: 20px 16px 60px; }
   header { display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; }
   h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  h2 { font-size: 1.05rem; margin: 22px 0 8px; }
   .muted { color: var(--muted); font-size: .9rem; }
   a { color: var(--accent); }
   button, input, textarea { font: inherit; }
-  button { border:1px solid var(--line); background:#fff; border-radius:8px; padding:6px 12px; cursor:pointer; }
+  button { border:1px solid var(--line); background:#fff; border-radius:8px; padding:6px 12px; cursor:pointer; color:var(--ink); }
   button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button.small { padding:2px 9px; font-size:.88rem; }
   button.link { border:none; background:none; padding:0; color:var(--accent); text-decoration:underline; }
   button:disabled { opacity:.5; cursor:default; }
-  input, textarea { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:#fff; }
+  input:not([type=checkbox]), textarea { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:#fff; }
+  label.check { display:inline-flex; align-items:center; gap:6px; margin-right:14px; cursor:pointer; }
   .tabs { display:flex; gap:6px; flex-wrap:wrap; margin:18px 0; }
   .tabs button[aria-pressed="true"] { background:var(--ink); color:#fff; border-color:var(--ink); }
+  .tabs .count { display:inline-block; min-width:1.4em; padding:0 5px; margin-left:4px; border-radius:99px; background:var(--accent); color:#fff; font-size:.8rem; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:10px; }
   form.card { display:grid; gap:8px; }
-  .row { display:grid; grid-template-columns: 1fr 120px; gap:8px; }
+  .row { display:grid; grid-template-columns: 1fr 110px; gap:8px; }
+  .row3 { display:grid; grid-template-columns: 1fr 80px; gap:8px; align-items:center; }
   .item { display:flex; gap:12px; align-items:flex-start; }
   .item img { width:72px; height:72px; object-fit:contain; border-radius:8px; background:#f3f0ec; flex:none; }
   .item .body { flex:1; min-width:0; }
   .item .title { font-weight:600; overflow-wrap:anywhere; }
-  .item .actions { flex:none; text-align:right; display:grid; gap:6px; justify-items:end; }
-  .bought .title, .bought img { opacity:.55; }
+  .item .actions { flex:none; text-align:right; display:grid; gap:6px; justify-items:end; max-width:45%; }
+  .item .edit { margin-top:6px; display:flex; gap:6px; }
+  .star { color:var(--gold); }
+  .taken .title, .taken img { opacity:.55; }
   .tag { font-size:.85rem; padding:2px 8px; border-radius:99px; background:#eee; white-space:nowrap; }
   .tag.ok { background:#e3f2e8; color:var(--ok); }
-  #msg { position:fixed; left:50%; bottom:16px; transform:translateX(-50%); background:var(--ink); color:#fff; padding:8px 14px; border-radius:8px; display:none; max-width:90vw; }
+  .tag.secret { background:#f3e8f6; color:#7a3d8c; }
+  .tag.warn { background:#fbe9e5; color:var(--accent); }
+  .removed { border-style:dashed; }
+  .banner { background:#fff4cc; border:1px solid #e8d48a; border-radius:8px; padding:8px 12px; margin:12px 0; font-size:.9rem; }
+  .tools { margin:18px 0; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  #msg { position:fixed; left:50%; bottom:16px; transform:translateX(-50%); background:var(--ink); color:#fff; padding:8px 14px; border-radius:8px; display:none; max-width:90vw; z-index:9; }
   #msg.show { display:block; }
   .hidden { display:none !important; }
 </style>
@@ -47,6 +59,7 @@
     </div>
     <div><a href="help.html">How it works</a> <button id="refresh" class="hidden">Refresh</button></div>
   </header>
+  <div id="banners"></div>
 
   <!-- First visit -->
   <form id="login" class="card hidden" style="margin-top:18px">
@@ -59,28 +72,49 @@
 
   <div id="app" class="hidden">
     <nav class="tabs" id="tabs"></nav>
-
-    <form id="add" class="card hidden">
-      <strong>Add something to your list</strong>
-      <input id="fUrl" placeholder="Paste a link or a shared message (optional)" inputmode="url" autocomplete="off">
-      <div class="row">
-        <input id="fTitle" placeholder="What is it?">
-        <input id="fPrice" placeholder="Price">
-      </div>
-      <input id="fNotes" placeholder="Notes: size, colour, 'any of these'…">
-      <input id="fImage" type="hidden">
-      <div><button class="primary" id="addBtn">Add to my list</button> <span class="muted" id="previewStatus"></span></div>
-    </form>
-
     <p class="muted" id="hint"></p>
+    <div id="formSlot"></div>
     <div id="list"></div>
+    <div id="extra"></div>
   </div>
+
+  <!-- One form, used for adding and editing; moved into place by render() -->
+  <form id="add" class="card hidden">
+    <strong id="formTitle"></strong>
+    <input id="fUrl" placeholder="Paste a link or a shared message (optional)" inputmode="url" autocomplete="off">
+    <div class="row">
+      <input id="fTitle" placeholder="What is it?">
+      <input id="fPrice" placeholder="Price">
+    </div>
+    <input id="fNotes" placeholder="Notes: size, colour, 'any of these'…">
+    <div>
+      <label class="check"><input type="checkbox" id="fPriority"> <span class="star">★</span> Really want this</label>
+      <label class="check">How many? <input id="fQty" type="number" min="1" max="99" value="1" style="width:64px"></label>
+    </div>
+    <label class="check" id="secretRow"><input type="checkbox" id="fSecret">
+      <span>Secret suggestion: <span id="secretWho"></span> won't see it</span></label>
+    <input id="fImage" type="hidden">
+    <div><button class="primary" id="addBtn"></button>
+      <button type="button" id="cancelBtn" class="hidden">Cancel</button>
+      <span class="muted" id="previewStatus"></span></div>
+  </form>
 </main>
 <div id="msg"></div>
 
 <script>
 // Paste the Apps Script "Web app" URL here (see README.md).
-const API_URL = 'https://script.google.com/macros/s/AKfycbwsaMOQ9t-oj8aJvsazn9udICuAV8-2vvMxxeeuKLSIGmmYcwVo6NLXGnl_m8a9viIrWA/exec';
+const DEFAULT_API = 'https://script.google.com/macros/s/AKfycbwsaMOQ9t-oj8aJvsazn9udICuAV8-2vvMxxeeuKLSIGmmYcwVo6NLXGnl_m8a9viIrWA/exec';
+
+// For testing a copy of the Sheet: open the page with ?api=<test web app URL> (and ?api=default to undo).
+const API_RE = /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/;
+(() => {
+  const p = new URLSearchParams(location.search).get('api');
+  if (p === 'default') localStorage.removeItem('wl.api');
+  else if (p && API_RE.test(p)) localStorage.setItem('wl.api', p);
+  if (p) history.replaceState(null, '', location.pathname + location.hash);
+})();
+const API_URL = localStorage.getItem('wl.api') || DEFAULT_API;
+const TESTING = API_URL !== DEFAULT_API;
 
 const $ = id => document.getElementById(id);
 const store = {
@@ -89,16 +123,26 @@ const store = {
   set(me, code) { localStorage.setItem('wl.me', me); localStorage.setItem('wl.code', code); },
   clear() { localStorage.removeItem('wl.me'); localStorage.removeItem('wl.code'); }
 };
-let items = [];
-let view = 'me';  // 'me' or an owner's name
+let data = { items: [], received: [] };
+let view = 'me';            // 'me', 'shopping', or a person's name
+let extraPeople = [];       // lists started this session that have no items yet
+let editing = null;         // item being edited
+let formOpen = false;       // add form on someone else's list
+let oldBackend = false;
+const FORM = $('add');
+// Put the shared form somewhere safe (hidden) before its container is rewritten.
+function park() { FORM.classList.add('hidden'); document.querySelector('main').appendChild(FORM); }
 
 const norm = s => String(s || '').trim().toLowerCase();
-const esc = s => String(s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+const same = (a, b) => norm(a) === norm(b);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 const safeUrl = u => /^https?:\/\//i.test(u || '') ? esc(u) : '';
+const taken = i => i.claims.reduce((n, c) => n + c.qty, 0);
+const mineClaim = i => i.claims.find(c => same(c.buyer, store.me));
 
 function toast(text) {
   const m = $('msg'); m.textContent = text; m.classList.add('show');
-  clearTimeout(toast.t); toast.t = setTimeout(() => m.classList.remove('show'), 3500);
+  clearTimeout(toast.t); toast.t = setTimeout(() => m.classList.remove('show'), 4000);
 }
 
 async function api(action, extra = {}) {
@@ -109,58 +153,194 @@ async function api(action, extra = {}) {
   });
   const out = await res.json();
   if (!out.ok) throw new Error(out.error);
+  oldBackend = !(out.v >= 2);
   return out.data;
 }
 
 async function run(action, extra) {
-  try { items = await api(action, extra); render(); return true; }
-  catch (e) {
+  try {
+    const d = await api(action, extra);
+    if (action !== 'preview') data = Array.isArray(d) ? { items: [], received: [] } : d;
+    render();
+    return true;
+  } catch (e) {
     toast(e.message);
     if (/family code/i.test(e.message)) { store.clear(); start(); }
     return false;
   }
 }
 
+function people() {
+  const m = new Map();
+  data.items.filter(i => !same(i.owner, store.me) && !i.removedBy).forEach(i => m.set(norm(i.owner), i.owner.trim()));
+  extraPeople.forEach(p => { if (!m.has(norm(p))) m.set(norm(p), p); });
+  return [...m.values()].sort((a, b) => a.localeCompare(b));
+}
+
 function render() {
   const me = store.me;
   $('who').innerHTML = `Signed in as <b>${esc(me)}</b> · <button class="link" id="logout">not you?</button>`;
   $('logout').onclick = () => { store.clear(); start(); };
+  $('banners').innerHTML =
+    (TESTING ? `<div class="banner"><b>TEST MODE:</b> using a test copy of the spreadsheet. <a href="?api=default">Switch back</a></div>` : '') +
+    (oldBackend ? `<div class="banner">The Google script is out of date for this page. Paste the new <code>Code.gs</code> into Apps Script and deploy a new version (see README).</div>` : '');
 
-  const owners = [...new Map(items.filter(i => norm(i.owner) !== norm(me))
-    .map(i => [norm(i.owner), i.owner.trim()])).values()].sort((a, b) => a.localeCompare(b));
-  if (view !== 'me' && !owners.some(o => norm(o) === norm(view))) view = 'me';
+  const ppl = people();
+  if (!['me', 'shopping'].includes(view) && !ppl.some(p => same(p, view))) view = 'me';
+  const shopping = data.items.filter(i => mineClaim(i));
+  const toBuy = shopping.filter(i => !mineClaim(i).bought || i.removedBy).length;
 
-  $('tabs').innerHTML = [`<button data-v="me" aria-pressed="${view === 'me'}">My list</button>`]
-    .concat(owners.map(o => `<button data-v="${esc(o)}" aria-pressed="${norm(view) === norm(o)}">${esc(o)}</button>`)).join('');
-  $('tabs').querySelectorAll('button').forEach(b => b.onclick = () => { view = b.dataset.v; render(); });
+  const tab = (v, label) => `<button data-v="${esc(v)}" aria-pressed="${same(view, v)}">${label}</button>`;
+  $('tabs').innerHTML = tab('me', 'My list') +
+    tab('shopping', 'My shopping' + (toBuy ? `<span class="count">${toBuy}</span>` : '')) +
+    ppl.map(p => tab(p, esc(p))).join('') +
+    `<button data-new="1" title="Start a list for someone, e.g. a child or grandparent">+ Someone else</button>`;
+  $('tabs').querySelectorAll('button[data-v]').forEach(b => b.onclick = () => {
+    view = b.dataset.v; formOpen = false; stopEdit(); render();
+    run('list');  // show what we have straight away, then catch up with everyone else's changes
+  });
+  $('tabs').querySelector('[data-new]').onclick = newPerson;
 
-  const mine = view === 'me';
-  $('add').classList.toggle('hidden', !mine);
-  const list = items.filter(i => norm(i.owner) === norm(mine ? me : view));
+  if (view === 'shopping') renderShopping(shopping);
+  else renderList(view === 'me' ? me : view);
+}
+
+function sortItems(list) {
+  return list.slice().sort((a, b) => (b.priority - a.priority) || String(a.added).localeCompare(String(b.added)));
+}
+
+function renderList(owner) {
+  const mine = same(owner, store.me);
+  const list = sortItems(data.items.filter(i => same(i.owner, owner) && !i.removedBy));
   $('hint').textContent = mine
     ? "To keep it a surprise, you won't see what's been bought from your list."
-    : `Tap "I'll get this" so nobody else buys the same thing. ${view} can't see this.`;
+    : `Tap "I'll get this" so nobody else buys the same thing. ${owner} can't see who's getting what.`;
 
-  $('list').innerHTML = list.length ? list.map(i => {
-    const img = safeUrl(i.image) ? `<img src="${safeUrl(i.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()" onload="if(this.naturalWidth<2)this.remove()">` : '';
-    const title = safeUrl(i.url) ? `<a href="${safeUrl(i.url)}" target="_blank" rel="noopener noreferrer">${esc(i.title)}</a>` : esc(i.title);
-    let actions;
-    if (mine) actions = `<button data-act="remove" data-id="${esc(i.id)}">Remove</button>`;
-    else if (!i.boughtBy) actions = `<button class="primary" data-act="claim" data-id="${esc(i.id)}">I'll get this</button>`;
-    else if (norm(i.boughtBy) === norm(me)) actions = `<span class="tag ok">You're getting this</span><button class="link" data-act="unclaim" data-id="${esc(i.id)}">undo</button>`;
-    else actions = `<span class="tag">Bought by ${esc(i.boughtBy)}</span>`;
-    return `<div class="card item ${i.boughtBy ? 'bought' : ''}">${img}
-      <div class="body"><div class="title">${title}</div>
-        <div class="muted">${[esc(i.price), esc(i.notes)].filter(Boolean).join(' · ')}</div></div>
-      <div class="actions">${actions}</div></div>`;
-  }).join('') : `<p class="muted">${mine ? 'Nothing on your list yet. Paste a link above.' : 'Nothing here yet.'}</p>`;
+  // Form: always open on your own list, behind a button on other people's.
+  const showForm = mine || formOpen || editing;
+  park();
+  $('formSlot').innerHTML = showForm ? '' :
+    `<div class="tools"><button id="openForm">+ Add something to ${esc(owner)}'s list</button></div>`;
+  if (showForm) { $('formSlot').appendChild(FORM); setupForm(owner); }
+  else $('openForm').onclick = () => { formOpen = true; render(); };
 
-  $('list').querySelectorAll('button[data-act]').forEach(b => b.onclick = async () => {
-    if (b.dataset.act === 'remove' && !confirm('Remove this from your list?')) return;
+  $('list').innerHTML = list.length ? list.map(i => card(i, mine)).join('')
+    : `<p class="muted">${mine ? 'Nothing on your list yet. Paste a link above.' : `Nothing on ${esc(owner)}'s list yet.`}</p>`;
+  wire($('list'));
+
+  // After the occasion: tidy away bought things (and, for your own list, see what you were given).
+  let extra = `<div class="tools"><button id="archive">${mine ? '🎁 Open my presents' : `Tidy up ${esc(owner)}'s list`}</button>
+    <span class="muted">${mine ? 'After your birthday or Christmas: see what you were given and clear it off your list.'
+      : `After ${esc(owner)}'s birthday or Christmas: move bought things off the list.`}</span></div>`;
+  if (mine && data.received.length) {
+    extra += `<h2>Presents received</h2>` + data.received.map(r =>
+      `<div class="card item">${img(r.image)}<div class="body"><div class="title">${link(r.url, r.title)}</div>
+        <div class="muted">From ${r.from.map(esc).join(', ')} · ${new Date(r.date).toLocaleDateString()}</div></div></div>`).join('');
+  }
+  $('extra').innerHTML = extra;
+  $('archive').onclick = async () => {
+    const msg = mine
+      ? "Only do this after the occasion!\n\nEverything that's been bought moves off your list into 'Presents received', and you'll see who it was from."
+      : `Only do this after the occasion!\n\nEverything that's been bought moves off ${owner}'s list. ${owner} will notice those things have gone.`;
+    if (confirm(msg)) await run('archive', { owner });
+  };
+}
+
+function renderShopping(list) {
+  $('hint').textContent = "Everything you've said you'll get. Tick things off once you've bought them.";
+  park();
+  $('formSlot').innerHTML = '';
+  $('extra').innerHTML = '';
+  if (!list.length) { $('list').innerHTML = `<p class="muted">Nothing yet. Open someone's list and tap "I'll get this".</p>`; return; }
+  const byOwner = {};
+  list.forEach(i => (byOwner[i.owner.trim()] = byOwner[i.owner.trim()] || []).push(i));
+  $('list').innerHTML = Object.keys(byOwner).sort().map(o => `<h2>For ${esc(o)}</h2>` + byOwner[o].map(i => {
+    const c = mineClaim(i);
+    const body = `<div class="body"><div class="title">${link(i.url, i.title)}</div>
+      <div class="muted">${[esc(i.price), c.qty > 1 ? `you're getting ${c.qty}` : '', esc(i.notes)].filter(Boolean).join(' · ')}</div>
+      ${i.removedBy ? `<div style="margin-top:6px"><span class="tag warn">Removed from the list by ${esc(i.removedBy)}</span></div>` : ''}</div>`;
+    const actions = i.removedBy
+      ? `<button class="small" data-act="dismiss" data-id="${esc(i.id)}">Take off my shopping</button>`
+      : `<label class="check"><input type="checkbox" data-bought="${esc(i.id)}" ${c.bought ? 'checked' : ''}> Bought</label>
+         <button class="link" data-act="unclaim" data-id="${esc(i.id)}">undo</button>`;
+    return `<div class="card item ${i.removedBy ? 'removed' : ''} ${c.bought ? 'taken' : ''}">${img(i.image)}${body}<div class="actions">${actions}</div></div>`;
+  }).join('')).join('');
+  wire($('list'));
+}
+
+const img = u => safeUrl(u) ? `<img src="${safeUrl(u)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()" onload="if(this.naturalWidth<2)this.remove()">` : '';
+const link = (u, t) => safeUrl(u) ? `<a href="${safeUrl(u)}" target="_blank" rel="noopener noreferrer">${esc(t)}</a>` : esc(t);
+
+function card(i, mine) {
+  const me = store.me, c = mineClaim(i), n = taken(i), full = n >= i.qty;
+  const canChange = mine || same(i.addedBy, me);
+  const meta = [esc(i.price), i.qty > 1 ? `wants ${i.qty}` : '', esc(i.notes)].filter(Boolean).join(' · ');
+  const tags = [
+    i.secret ? `<span class="tag secret">Secret suggestion from ${esc(i.addedBy)}</span>` : '',
+    !i.secret && i.addedBy && !same(i.addedBy, i.owner) ? `<span class="tag">added by ${esc(i.addedBy)}</span>` : ''
+  ].join(' ');
+  let actions = '';
+  if (!mine) {
+    actions = i.claims.filter(x => !same(x.buyer, me)).map(x =>
+      `<span class="tag">${esc(x.buyer)}${x.qty > 1 ? ' ×' + x.qty : ''} is getting this${x.bought ? ' ✓' : ''}</span>`).join('');
+    if (c) actions += `<span class="tag ok">You're getting ${c.qty > 1 ? c.qty : 'this'}</span>
+      <span>${!full ? `<button class="link" data-act="claim" data-id="${esc(i.id)}">+1</button> · ` : ''}<button class="link" data-act="unclaim" data-id="${esc(i.id)}">undo</button></span>`;
+    else if (!full) actions += `<button class="primary" data-act="claim" data-id="${esc(i.id)}">I'll get ${i.qty > 1 ? 'one' : 'this'}</button>`;
+    if (i.qty > 1 && n) actions += `<span class="muted">${Math.min(n, i.qty)} of ${i.qty} taken</span>`;
+  }
+  return `<div class="card item ${!mine && full ? 'taken' : ''}">${img(i.image)}
+    <div class="body"><div class="title">${i.priority ? '<span class="star" title="Really wants this">★</span> ' : ''}${link(i.url, i.title)}</div>
+      <div class="muted">${meta}</div>${tags.trim() ? `<div style="margin-top:4px">${tags}</div>` : ''}
+      ${canChange ? `<div class="edit"><button class="small" data-edit="${esc(i.id)}">Edit</button><button class="small" data-act="remove" data-id="${esc(i.id)}">Remove</button></div>` : ''}</div>
+    <div class="actions">${actions}</div></div>`;
+}
+
+function wire(root) {
+  root.querySelectorAll('button[data-act]').forEach(b => b.onclick = async () => {
+    if (b.dataset.act === 'remove' && !confirm('Remove this from the list?')) return;
     b.disabled = true;
     await run(b.dataset.act, { id: b.dataset.id });
   });
+  root.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => startEdit(data.items.find(i => i.id === b.dataset.edit)));
+  root.querySelectorAll('[data-bought]').forEach(cb => cb.onchange = async () => {
+    cb.disabled = true;
+    await run('bought', { id: cb.dataset.bought, bought: cb.checked });
+  });
 }
+
+function newPerson() {
+  const name = (prompt("Whose list? (e.g. a child or grandparent who won't use this themselves)") || '').replace(/\s+/g, ' ').trim();
+  if (!name) return;
+  if (same(name, store.me)) { view = 'me'; render(); return; }
+  if (!people().some(p => same(p, name))) extraPeople.push(name);
+  view = people().find(p => same(p, name)); formOpen = true; stopEdit(); render();
+}
+
+// ---- Add / edit form ----
+function setupForm(owner) {
+  const mine = same(owner, store.me);
+  $('add').classList.remove('hidden');
+  $('formTitle').textContent = editing ? 'Edit' : mine ? 'Add something to your list' : `Add something to ${owner}'s list`;
+  $('addBtn').textContent = editing ? 'Save changes' : mine ? 'Add to my list' : `Add to ${owner}'s list`;
+  $('cancelBtn').classList.toggle('hidden', !editing && mine);
+  $('secretRow').classList.toggle('hidden', mine);
+  $('secretWho').textContent = owner;
+  $('add').dataset.owner = owner;
+}
+function resetForm() {
+  $('add').reset(); $('fImage').value = ''; $('fQty').value = 1; previewFor = '';
+  $('fSecret').checked = true;  // suggestions for other people are secret unless unticked
+}
+function startEdit(i) {
+  editing = i; formOpen = true;
+  $('fUrl').value = i.url; $('fTitle').value = i.title; $('fPrice').value = i.price; $('fNotes').value = i.notes;
+  $('fImage').value = i.image; $('fQty').value = i.qty; $('fPriority').checked = i.priority; $('fSecret').checked = i.secret;
+  previewFor = i.url;
+  render();
+  $('add').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function stopEdit() { if (editing) { editing = null; resetForm(); } }
+$('cancelBtn').onclick = () => { stopEdit(); formOpen = false; render(); };
 
 // When a link is pasted, fetch the title/price/picture so the form fills itself.
 let previewFor = '';
@@ -184,8 +364,8 @@ async function preview() {
     const m = await api('preview', { url });
     if (url !== $('fUrl').value.trim()) return;
     if (m.url) $('fUrl').value = previewFor = m.url;
-    if (!$('fTitle').value) $('fTitle').value = m.title || '';
-    if (!$('fPrice').value) $('fPrice').value = m.price || '';
+    if (!$('fTitle').value || editing) $('fTitle').value = m.title || $('fTitle').value;
+    if (!$('fPrice').value || editing) $('fPrice').value = m.price || $('fPrice').value;
     $('fImage').value = m.image || '';
     $('previewStatus').textContent = m.title ? '' : "Couldn't read that page; type a title.";
   } catch (e) { $('previewStatus').textContent = ''; }
@@ -196,21 +376,31 @@ $('fUrl').addEventListener('paste', () => setTimeout(preview, 0));
 $('add').onsubmit = async e => {
   e.preventDefault();
   splitShared();
-  const data = { url: $('fUrl').value.trim(), title: $('fTitle').value.trim(), price: $('fPrice').value.trim(),
-                 notes: $('fNotes').value.trim(), image: $('fImage').value };
-  if (!data.url && !data.title) return toast('Paste a link or type what it is');
+  const d = { url: $('fUrl').value.trim(), title: $('fTitle').value.trim(), price: $('fPrice').value.trim(),
+    notes: $('fNotes').value.trim(), image: $('fImage').value, qty: $('fQty').value,
+    priority: $('fPriority').checked, secret: $('fSecret').checked };
+  if (!d.url && !d.title) return toast('Paste a link or type what it is');
+  if (editing && d.url !== editing.url && previewFor !== d.url) d.image = '';
   $('addBtn').disabled = true; $('previewStatus').textContent = 'Saving…';
-  if (await run('add', data)) { $('add').reset(); $('fImage').value = ''; previewFor = ''; }
+  const ok = editing ? await run('edit', { id: editing.id, ...d }) : await run('add', { owner: $('add').dataset.owner, ...d });
+  if (ok) {
+    const wasEditing = !!editing;
+    editing = null; resetForm();
+    if (!same($('add').dataset.owner, store.me)) formOpen = false;
+    extraPeople = extraPeople.filter(p => !same(p, $('add').dataset.owner));
+    render();
+    toast(wasEditing ? 'Saved' : 'Added');
+  }
   $('addBtn').disabled = false; $('previewStatus').textContent = '';
 };
 
 $('login').onsubmit = e => {
   e.preventDefault();
-  store.set($('loginName').value.trim(), $('loginCode').value.trim());
+  store.set($('loginName').value.replace(/\s+/g, ' ').trim(), $('loginCode').value.trim());
   start();
 };
 $('refresh').onclick = () => run('list');
-document.addEventListener('visibilitychange', () => { if (!document.hidden && store.me) run('list'); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && store.me && !editing) run('list'); });
 
 function start() {
   const signedIn = !!(store.me && store.code);
@@ -218,11 +408,11 @@ function start() {
   $('app').classList.toggle('hidden', !signedIn);
   $('refresh').classList.toggle('hidden', !signedIn);
   $('who').textContent = '';
+  $('banners').innerHTML = TESTING ? `<div class="banner"><b>TEST MODE:</b> using a test copy of the spreadsheet. <a href="?api=default">Switch back</a></div>` : '';
+  resetForm();
   if (signedIn) { view = 'me'; run('list'); }
 }
-if (API_URL.startsWith('PASTE')) document.querySelector('main').innerHTML =
-  '<h1>Wish lists</h1><p>Not set up yet. Paste the Apps Script web app URL into <code>API_URL</code> in this file (see README.md).</p>';
-else start();
+start();
 </script>
 </body>
 </html>

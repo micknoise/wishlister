@@ -7,11 +7,13 @@
 // Shared secret everyone types in once. Change it before deploying.
 const FAMILY_CODE = 'change-me';
 
-const SHEET_NAME = 'Items';
-const COLS = ['id', 'owner', 'title', 'url', 'image', 'price', 'notes', 'boughtBy', 'added'];
+const API_VERSION = 2;
+const ITEM_COLS = ['id', 'owner', 'title', 'url', 'image', 'price', 'notes', 'addedBy', 'secret',
+  'priority', 'qty', 'removedBy', 'archived', 'added'];
+const CLAIM_COLS = ['itemId', 'buyer', 'qty', 'bought', 'archived', 'added'];
 
 function doGet() {
-  return ContentService.createTextOutput('Wish list API is running.');
+  return ContentService.createTextOutput('Wish list API is running (v' + API_VERSION + ').');
 }
 
 function doPost(e) {
@@ -19,96 +21,228 @@ function doPost(e) {
   try {
     const req = JSON.parse(e.postData.contents);
     if (req.code !== FAMILY_CODE) throw new Error('Wrong family code');
-    req.me = String(req.me || '').trim();
+    req.me = clean_(req.me);
     if (!req.me) throw new Error('Missing name');
-    out = { ok: true, data: handle_(req) };
+    out = { ok: true, v: API_VERSION, data: handle_(req) };
   } catch (err) {
-    out = { ok: false, error: String(err && err.message || err) };
+    out = { ok: false, v: API_VERSION, error: String(err && err.message || err) };
   }
   return ContentService.createTextOutput(JSON.stringify(out))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+const clean_ = v => String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
+const same_ = (a, b) => clean_(a).toLowerCase() === clean_(b).toLowerCase();
+const num_ = v => Math.max(1, Math.min(99, parseInt(v, 10) || 1));
+const yes_ = v => v ? 'yes' : '';
+const now_ = () => new Date().toISOString();
+
 function handle_(req) {
-  if (req.action === 'list') return list_(req.me);
   if (req.action === 'preview') return fetchMeta_(req.url);
 
   const lock = LockService.getScriptLock();
-  lock.waitLock(10000);
+  lock.waitLock(15000);
   try {
-    const sheet = sheet_();
-    const items = read_(sheet);
-    const same = (a, b) => String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
+    const me = req.me, db = db_();
     const find = () => {
-      const i = items.findIndex(it => it.id === String(req.id));
-      if (i < 0) throw new Error('Item not found (maybe deleted) – refresh');
-      return { item: items[i], row: i + 2 };
+      const it = db.items.rows.find(r => r.id === String(req.id));
+      // Secret suggestions don't exist as far as the list owner is concerned.
+      if (!it || (it.secret && same_(it.owner, me))) throw new Error('Item not found (maybe deleted) – refresh');
+      return it;
     };
+    const claimsOn = id => db.claims.rows.filter(c => c.itemId === id && !c.archived);
+    const myClaim = id => claimsOn(id).find(c => same_(c.buyer, me));
+    const canChange = it => same_(it.owner, me) || same_(it.addedBy, me);
+    const taken = id => claimsOn(id).reduce((n, c) => n + num_(c.qty), 0);
 
-    if (req.action === 'add') {
-      let url = String(req.url || '').trim();
-      let meta = { url: '', title: '', image: '', price: '' };
-      if (url && !(req.title && req.image)) meta = fetchMeta_(url);
-      if (meta.url) url = meta.url;
-      const title = String(req.title || meta.title || '').trim();
-      if (!title && !url) throw new Error('Add a link or a title');
-      sheet.appendRow([
-        Utilities.getUuid().slice(0, 8), req.me, title || url, url,
-        String(req.image || meta.image || ''), String(req.price || meta.price || ''),
-        String(req.notes || ''), '', new Date().toISOString()
-      ].map(safe_));
-    } else if (req.action === 'claim') {
-      const { item, row } = find();
-      if (same(item.owner, req.me)) throw new Error("That's on your own list");
-      if (item.boughtBy && !same(item.boughtBy, req.me)) throw new Error('Already bought by ' + item.boughtBy);
-      sheet.getRange(row, COLS.indexOf('boughtBy') + 1).setValue(safe_(req.me));
-    } else if (req.action === 'unclaim') {
-      const { item, row } = find();
-      if (!same(item.boughtBy, req.me)) throw new Error('Only the person who bought it can undo');
-      sheet.getRange(row, COLS.indexOf('boughtBy') + 1).setValue('');
-    } else if (req.action === 'remove') {
-      const { item, row } = find();
-      if (!same(item.owner, req.me)) throw new Error('You can only remove items from your own list');
-      sheet.deleteRow(row);
-    } else {
-      throw new Error('Unknown action');
+    switch (req.action) {
+      case 'list': break;
+
+      case 'add': {
+        const owner = clean_(req.owner) || me;
+        const d = details_(req, null);
+        db.items.append(Object.assign(d, {
+          id: Utilities.getUuid().slice(0, 8), owner: owner, addedBy: me,
+          secret: yes_(req.secret && !same_(owner, me)), added: now_()
+        }));
+        break;
+      }
+
+      case 'edit': {
+        const it = find();
+        if (!canChange(it)) throw new Error('Only the list owner or whoever added it can edit this');
+        const d = details_(req, it);
+        if (!same_(it.owner, me)) d.secret = yes_(req.secret);
+        Object.keys(d).forEach(k => { if (String(d[k]) !== it[k]) db.items.set(it, k, d[k]); });
+        break;
+      }
+
+      case 'remove': {
+        const it = find();
+        if (!canChange(it)) throw new Error('Only the list owner or whoever added it can remove this');
+        // If someone has already claimed it, keep it so they can see it was removed.
+        if (claimsOn(it.id).length) db.items.set(it, 'removedBy', me);
+        else db.items.del(it);
+        break;
+      }
+
+      case 'claim': {
+        const it = find();
+        if (same_(it.owner, me)) throw new Error("That's on your own list");
+        if (it.removedBy || it.archived) throw new Error('That item is no longer on the list');
+        if (taken(it.id) >= num_(it.qty)) throw new Error('Someone has already got this');
+        const c = myClaim(it.id);
+        if (c) db.claims.set(c, 'qty', num_(c.qty) + 1);
+        else db.claims.append({ itemId: it.id, buyer: me, qty: 1, bought: '', archived: '', added: now_() });
+        break;
+      }
+
+      case 'unclaim': case 'dismiss': {
+        const it = find(), c = myClaim(it.id);
+        if (!c) throw new Error("You haven't said you'll get this");
+        if (req.action === 'unclaim' && num_(c.qty) > 1) db.claims.set(c, 'qty', num_(c.qty) - 1);
+        else {
+          db.claims.del(c);
+          if (it.removedBy && !claimsOn(it.id).length) db.items.del(it);
+        }
+        break;
+      }
+
+      case 'bought': {
+        const c = myClaim(String(req.id));
+        if (!c) throw new Error("You haven't said you'll get this");
+        db.claims.set(c, 'bought', yes_(req.bought));
+        break;
+      }
+
+      case 'archive': {
+        // After the occasion: claimed things move to "presents received"; unclaimed ones stay.
+        const owner = clean_(req.owner) || me, when = now_();
+        db.items.rows.filter(it => same_(it.owner, owner) && !it.archived).forEach(it => {
+          const cs = claimsOn(it.id);
+          if (!cs.length) return;
+          const n = taken(it.id);
+          cs.forEach(c => db.claims.set(c, 'archived', when));
+          if (it.removedBy || n >= num_(it.qty)) db.items.set(it, 'archived', when);
+          else db.items.set(it, 'qty', num_(it.qty) - n);
+        });
+        break;
+      }
+
+      default: throw new Error('Unknown action');
     }
+    return view_(db_(), me);
   } finally {
     lock.releaseLock();
   }
-  return list_(req.me);
 }
 
-// Everyone's items, with "bought" info hidden on your own list to keep the surprise.
-function list_(me) {
-  const mine = String(me).trim().toLowerCase();
-  return read_(sheet_()).map(it => {
-    if (it.owner.trim().toLowerCase() === mine) it.boughtBy = '';
-    return it;
-  });
-}
-
-function sheet_() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sh = ss.getSheetByName(SHEET_NAME);
-  if (!sh) {
-    sh = ss.insertSheet(SHEET_NAME);
-    sh.appendRow(COLS);
-    sh.setFrozenRows(1);
+// Item fields from a request, looking up the link when needed.
+function details_(req, old) {
+  let url = clean_(req.url), image = clean_(req.image), title = clean_(req.title);
+  if (url && (!title || !image) && (!old || url !== old.url)) {
+    const meta = fetchMeta_(url);
+    if (meta.url) url = meta.url;
+    title = title || meta.title;
+    image = image || meta.image;
+    if (!clean_(req.price)) req.price = meta.price;
   }
-  return sh;
+  if (old && url === old.url && !image) image = old.image;
+  if (!title && !url) throw new Error('Add a link or a title');
+  return {
+    title: title || url, url: url, image: image, price: clean_(req.price),
+    notes: String(req.notes == null ? '' : req.notes).trim(),
+    priority: yes_(req.priority), qty: num_(req.qty)
+  };
 }
 
-function read_(sheet) {
-  const rows = sheet.getDataRange().getValues().slice(1);
-  return rows.filter(r => r[0] !== '').map(r => {
-    const o = {};
-    COLS.forEach((c, i) => {
-      const v = r[i];
-      o[c] = v instanceof Date ? v.toISOString() : String(v == null ? '' : v);
-    });
-    return o;
+// What `me` may see. Owners never get claims or secret suggestions for their own list.
+function view_(db, me) {
+  const byItem = {};
+  db.claims.rows.forEach(c => (byItem[c.itemId] = byItem[c.itemId] || []).push(c));
+  const items = [], received = [];
+  db.items.rows.forEach(it => {
+    const cs = byItem[it.id] || [], active = cs.filter(c => !c.archived);
+    if (same_(it.owner, me)) {
+      const given = cs.filter(c => c.archived);
+      if (given.length) received.push({
+        title: it.title, url: it.url, image: it.image,
+        from: given.map(c => c.buyer).filter((b, i, a) => a.findIndex(x => same_(x, b)) === i),
+        date: given.map(c => c.archived).sort().pop()
+      });
+      if (!it.secret && !it.removedBy && !it.archived) items.push(public_(it, []));
+      return;
+    }
+    if (it.archived) return;
+    if (it.removedBy && !active.some(c => same_(c.buyer, me))) return;
+    items.push(public_(it, active));
   });
+  received.sort((a, b) => b.date.localeCompare(a.date));
+  return { items: items, received: received };
+}
+
+function public_(it, claims) {
+  return {
+    id: it.id, owner: it.owner, title: it.title, url: it.url, image: it.image, price: it.price,
+    notes: it.notes, addedBy: it.addedBy, secret: !!it.secret, priority: !!it.priority,
+    qty: num_(it.qty), removedBy: it.removedBy, added: it.added,
+    claims: claims.map(c => ({ buyer: c.buyer, qty: num_(c.qty), bought: !!c.bought }))
+  };
+}
+
+function db_() {
+  const db = { items: table_('Items', ITEM_COLS), claims: table_('Claims', CLAIM_COLS) };
+  // One-off upgrade from v1, which kept a single "boughtBy" name on each item.
+  if (db.claims.created && db.items.header.indexOf('boughtBy') >= 0) {
+    db.items.rows.filter(it => it.boughtBy).forEach(it => {
+      db.claims.append({ itemId: it.id, buyer: it.boughtBy, qty: 1, bought: '', archived: '', added: now_() });
+      db.items.set(it, 'boughtBy', '');
+    });
+    db.claims = table_('Claims', CLAIM_COLS);
+  }
+  return db;
+}
+
+// A sheet as a list of row objects keyed by header; adds any missing columns.
+function table_(name, cols) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(name), created = false;
+  if (!sh) {
+    sh = ss.insertSheet(name);
+    sh.getRange(1, 1, 1, cols.length).setValues([cols]);
+    sh.setFrozenRows(1);
+    created = true;
+  }
+  const values = sh.getDataRange().getValues();
+  const header = values[0].map(h => String(h).trim());
+  while (header.length && !header[header.length - 1]) header.pop();
+  const missing = cols.filter(c => header.indexOf(c) < 0);
+  if (missing.length) {
+    sh.getRange(1, header.length + 1, 1, missing.length).setValues([missing]);
+    header.push.apply(header, missing);
+  }
+  const rows = [];
+  values.slice(1).forEach((r, i) => {
+    const o = { _row: i + 2 };
+    header.forEach((h, j) => {
+      const v = r[j];
+      o[h] = v instanceof Date ? v.toISOString() : String(v == null ? '' : v);
+    });
+    if (o[cols[0]] !== '') rows.push(o);
+  });
+  return {
+    header: header, rows: rows, created: created,
+    set(row, field, value) {
+      row[field] = String(value);
+      sh.getRange(row._row, header.indexOf(field) + 1).setValue(safe_(value));
+    },
+    append(obj) { sh.appendRow(header.map(h => safe_(obj[h] == null ? '' : obj[h]))); },
+    del(row) {
+      sh.deleteRow(row._row);
+      rows.splice(rows.indexOf(row), 1);
+      rows.forEach(r => { if (r._row > row._row) r._row--; });
+    }
+  };
 }
 
 // Stop text like "=IMPORTXML(...)" being treated as a spreadsheet formula.

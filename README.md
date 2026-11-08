@@ -6,8 +6,15 @@ No server, no accounts, no cost.
 - Everyone signs in once with their **first name** and a shared **family code**.
 - Paste a link and the title, price and picture are filled in automatically
   (most shops; if a site blocks it, type the details yourself).
-- On someone else's list, tap **I'll get this**. Others then see "Bought by Sam".
+- On someone else's list, tap **I'll get this**. Others then see "Sam is getting this".
   The list owner never sees what's been bought.
+- Edit items, star favourites, and ask for more than one ("want 2").
+- Add secret suggestions to someone else's list, or keep a list for someone who won't
+  use this (e.g. a child or grandparent).
+- **My shopping** lists everything you're getting, with a "Bought" tick. Items the owner
+  removes stay there, marked as removed.
+- After the occasion, **Open my presents** clears bought things into "Presents received"
+  (showing who gave what). Anyone can **Tidy up** a list for someone who doesn't use it.
 
 ## Setup (about 5 minutes, done once)
 
@@ -28,6 +35,43 @@ No server, no accounts, no cost.
 
 If you edit `Code.gs` later, use **Deploy → Manage deployments → Edit → New version**
 so the URL stays the same.
+
+## Data
+
+Two tabs in the Sheet, created automatically:
+
+- **Items**: `id, owner, title, url, image, price, notes, addedBy, secret, priority, qty, removedBy, archived, added`
+- **Claims**: `itemId, buyer, qty, bought, archived, added` (one row per person per item)
+
+The script adds missing columns itself. Sheets from the first version (with a `boughtBy`
+column) are upgraded the first time the new script runs: each `boughtBy` becomes a Claims row.
+
+## Updating the script
+
+1. Open the Sheet → **Extensions → Apps Script**, replace everything with the new `Code.gs`,
+   and put your real `FAMILY_CODE` back in. Save.
+2. **Deploy → Manage deployments →** pencil icon **→ Version: New version → Deploy.**
+   This keeps the same URL, so `index.html` doesn't change.
+
+If the page says "The Google script is out of date", step 2 hasn't been done.
+
+## Testing changes before going live
+
+Test against a *copy* of the Sheet, so the real lists are never touched:
+
+1. Open the real Sheet → **File → Make a copy** (call it "Wishlist TEST"). The copy brings its
+   own copy of the script and a snapshot of the real data, which is a good upgrade test.
+2. In the copy: **Extensions → Apps Script**, paste the new `Code.gs`, set `FAMILY_CODE`,
+   then **Deploy → New deployment → Web app** (Execute as: Me, Access: Anyone). Copy its URL.
+3. Open the new page with `?api=<test URL>` on the end. A yellow **TEST MODE** banner confirms
+   it's using the copy. Either:
+   - download `index.html` from the branch and open it in your browser, adding `?api=…`, or
+   - use `https://raw.githack.com/micknoise/wishlister/<commit>/index.html?api=…`.
+4. Use **Switch back** in the banner (or `?api=default`) to return to the real data.
+
+When happy, merge the branch into `main` and do **Updating the script** on the real Sheet.
+The live page shows the "out of date" banner from the merge until the script is updated,
+so do both together.
 
 ## Amazon
 
