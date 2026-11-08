@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Wish lists</title>
+<style>
+  :root { --bg:#faf8f5; --card:#fff; --ink:#222; --muted:#777; --line:#e6e1da; --accent:#b4432f; --ok:#2f7d4f; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:16px/1.45 system-ui, -apple-system, Segoe UI, sans-serif; background:var(--bg); color:var(--ink); }
+  main { max-width: 760px; margin: 0 auto; padding: 20px 16px 60px; }
+  header { display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  .muted { color: var(--muted); font-size: .9rem; }
+  a { color: var(--accent); }
+  button, input, textarea { font: inherit; }
+  button { border:1px solid var(--line); background:#fff; border-radius:8px; padding:6px 12px; cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button.link { border:none; background:none; padding:0; color:var(--accent); text-decoration:underline; }
+  button:disabled { opacity:.5; cursor:default; }
+  input, textarea { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:#fff; }
+  .tabs { display:flex; gap:6px; flex-wrap:wrap; margin:18px 0; }
+  .tabs button[aria-pressed="true"] { background:var(--ink); color:#fff; border-color:var(--ink); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:10px; }
+  form.card { display:grid; gap:8px; }
+  .row { display:grid; grid-template-columns: 1fr 120px; gap:8px; }
+  .item { display:flex; gap:12px; align-items:flex-start; }
+  .item img { width:72px; height:72px; object-fit:contain; border-radius:8px; background:#f3f0ec; flex:none; }
+  .item .body { flex:1; min-width:0; }
+  .item .title { font-weight:600; overflow-wrap:anywhere; }
+  .item .actions { flex:none; text-align:right; display:grid; gap:6px; justify-items:end; }
+  .bought .title, .bought img { opacity:.55; }
+  .tag { font-size:.85rem; padding:2px 8px; border-radius:99px; background:#eee; white-space:nowrap; }
+  .tag.ok { background:#e3f2e8; color:var(--ok); }
+  #msg { position:fixed; left:50%; bottom:16px; transform:translateX(-50%); background:var(--ink); color:#fff; padding:8px 14px; border-radius:8px; display:none; max-width:90vw; }
+  #msg.show { display:block; }
+  .hidden { display:none !important; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Wish lists</h1>
+      <div class="muted" id="who"></div>
+    </div>
+    <button id="refresh" class="hidden">Refresh</button>
+  </header>
+
+  <!-- First visit -->
+  <form id="login" class="card hidden" style="margin-top:18px">
+    <strong>Who are you?</strong>
+    <input id="loginName" placeholder="Your first name (e.g. Sam)" required autocomplete="given-name">
+    <input id="loginCode" placeholder="Family code" required autocomplete="off">
+    <div><button class="primary">Continue</button></div>
+    <div class="muted">Use the same name every time. That name is your list.</div>
+  </form>
+
+  <div id="app" class="hidden">
+    <nav class="tabs" id="tabs"></nav>
+
+    <form id="add" class="card hidden">
+      <strong>Add something to your list</strong>
+      <input id="fUrl" placeholder="Paste a link or a shared message (optional)" inputmode="url" autocomplete="off">
+      <div class="row">
+        <input id="fTitle" placeholder="What is it?">
+        <input id="fPrice" placeholder="Price">
+      </div>
+      <input id="fNotes" placeholder="Notes: size, colour, 'any of these'…">
+      <input id="fImage" type="hidden">
+      <div><button class="primary" id="addBtn">Add to my list</button> <span class="muted" id="previewStatus"></span></div>
+    </form>
+
+    <p class="muted" id="hint"></p>
+    <div id="list"></div>
+  </div>
+</main>
+<div id="msg"></div>
+
+<script>
+// Paste the Apps Script "Web app" URL here (see README.md).
+const API_URL = 'PASTE_WEB_APP_URL_HERE';
+
+const $ = id => document.getElementById(id);
+const store = {
+  get me() { return localStorage.getItem('wl.me') || ''; },
+  get code() { return localStorage.getItem('wl.code') || ''; },
+  set(me, code) { localStorage.setItem('wl.me', me); localStorage.setItem('wl.code', code); },
+  clear() { localStorage.removeItem('wl.me'); localStorage.removeItem('wl.code'); }
+};
+let items = [];
+let view = 'me';  // 'me' or an owner's name
+
+const norm = s => String(s || '').trim().toLowerCase();
+const esc = s => String(s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+const safeUrl = u => /^https?:\/\//i.test(u || '') ? esc(u) : '';
+
+function toast(text) {
+  const m = $('msg'); m.textContent = text; m.classList.add('show');
+  clearTimeout(toast.t); toast.t = setTimeout(() => m.classList.remove('show'), 3500);
+}
+
+async function api(action, extra = {}) {
+  // text/plain body avoids a CORS preflight, which Apps Script doesn't support.
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    body: JSON.stringify({ action, me: store.me, code: store.code, ...extra })
+  });
+  const out = await res.json();
+  if (!out.ok) throw new Error(out.error);
+  return out.data;
+}
+
+async function run(action, extra) {
+  try { items = await api(action, extra); render(); return true; }
+  catch (e) {
+    toast(e.message);
+    if (/family code/i.test(e.message)) { store.clear(); start(); }
+    return false;
+  }
+}
+
+function render() {
+  const me = store.me;
+  $('who').innerHTML = `Signed in as <b>${esc(me)}</b> · <button class="link" id="logout">not you?</button>`;
+  $('logout').onclick = () => { store.clear(); start(); };
+
+  const owners = [...new Map(items.filter(i => norm(i.owner) !== norm(me))
+    .map(i => [norm(i.owner), i.owner.trim()])).values()].sort((a, b) => a.localeCompare(b));
+  if (view !== 'me' && !owners.some(o => norm(o) === norm(view))) view = 'me';
+
+  $('tabs').innerHTML = [`<button data-v="me" aria-pressed="${view === 'me'}">My list</button>`]
+    .concat(owners.map(o => `<button data-v="${esc(o)}" aria-pressed="${norm(view) === norm(o)}">${esc(o)}</button>`)).join('');
+  $('tabs').querySelectorAll('button').forEach(b => b.onclick = () => { view = b.dataset.v; render(); });
+
+  const mine = view === 'me';
+  $('add').classList.toggle('hidden', !mine);
+  const list = items.filter(i => norm(i.owner) === norm(mine ? me : view));
+  $('hint').textContent = mine
+    ? "To keep it a surprise, you won't see what's been bought from your list."
+    : `Tap "I'll get this" so nobody else buys the same thing. ${view} can't see this.`;
+
+  $('list').innerHTML = list.length ? list.map(i => {
+    const img = safeUrl(i.image) ? `<img src="${safeUrl(i.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()" onload="if(this.naturalWidth<2)this.remove()">` : '';
+    const title = safeUrl(i.url) ? `<a href="${safeUrl(i.url)}" target="_blank" rel="noopener noreferrer">${esc(i.title)}</a>` : esc(i.title);
+    let actions;
+    if (mine) actions = `<button data-act="remove" data-id="${esc(i.id)}">Remove</button>`;
+    else if (!i.boughtBy) actions = `<button class="primary" data-act="claim" data-id="${esc(i.id)}">I'll get this</button>`;
+    else if (norm(i.boughtBy) === norm(me)) actions = `<span class="tag ok">You're getting this</span><button class="link" data-act="unclaim" data-id="${esc(i.id)}">undo</button>`;
+    else actions = `<span class="tag">Bought by ${esc(i.boughtBy)}</span>`;
+    return `<div class="card item ${i.boughtBy ? 'bought' : ''}">${img}
+      <div class="body"><div class="title">${title}</div>
+        <div class="muted">${[esc(i.price), esc(i.notes)].filter(Boolean).join(' · ')}</div></div>
+      <div class="actions">${actions}</div></div>`;
+  }).join('') : `<p class="muted">${mine ? 'Nothing on your list yet. Paste a link above.' : 'Nothing here yet.'}</p>`;
+
+  $('list').querySelectorAll('button[data-act]').forEach(b => b.onclick = async () => {
+    if (b.dataset.act === 'remove' && !confirm('Remove this from your list?')) return;
+    b.disabled = true;
+    await run(b.dataset.act, { id: b.dataset.id });
+  });
+}
+
+// When a link is pasted, fetch the title/price/picture so the form fills itself.
+let previewFor = '';
+// Share buttons (e.g. the Amazon app) paste "Product name https://amzn.eu/d/…": split that up.
+function splitShared() {
+  const raw = $('fUrl').value, m = raw.match(/https?:\/\/[^\s<>"]+/i);
+  if (!m) return;
+  const url = m[0].replace(/[).,!]+$/, '');
+  const rest = raw.replace(m[0], ' ').replace(/^\s*((check (this|out)[^:]*|amazon\.[a-z.]+)\s*:\s*)+/i, '')
+    .replace(/\s+/g, ' ').trim();
+  $('fUrl').value = url;
+  if (rest && !$('fTitle').value) $('fTitle').value = rest;
+}
+async function preview() {
+  splitShared();
+  const url = $('fUrl').value.trim();
+  if (!/^https?:\/\//i.test(url) || url === previewFor) return;
+  previewFor = url;
+  $('previewStatus').textContent = 'Looking up link…';
+  try {
+    const m = await api('preview', { url });
+    if (url !== $('fUrl').value.trim()) return;
+    if (m.url) $('fUrl').value = previewFor = m.url;
+    if (!$('fTitle').value) $('fTitle').value = m.title || '';
+    if (!$('fPrice').value) $('fPrice').value = m.price || '';
+    $('fImage').value = m.image || '';
+    $('previewStatus').textContent = m.title ? '' : "Couldn't read that page; type a title.";
+  } catch (e) { $('previewStatus').textContent = ''; }
+}
+$('fUrl').addEventListener('change', preview);
+$('fUrl').addEventListener('paste', () => setTimeout(preview, 0));
+
+$('add').onsubmit = async e => {
+  e.preventDefault();
+  splitShared();
+  const data = { url: $('fUrl').value.trim(), title: $('fTitle').value.trim(), price: $('fPrice').value.trim(),
+                 notes: $('fNotes').value.trim(), image: $('fImage').value };
+  if (!data.url && !data.title) return toast('Paste a link or type what it is');
+  $('addBtn').disabled = true; $('previewStatus').textContent = 'Saving…';
+  if (await run('add', data)) { $('add').reset(); $('fImage').value = ''; previewFor = ''; }
+  $('addBtn').disabled = false; $('previewStatus').textContent = '';
+};
+
+$('login').onsubmit = e => {
+  e.preventDefault();
+  store.set($('loginName').value.trim(), $('loginCode').value.trim());
+  start();
+};
+$('refresh').onclick = () => run('list');
+document.addEventListener('visibilitychange', () => { if (!document.hidden && store.me) run('list'); });
+
+function start() {
+  const signedIn = !!(store.me && store.code);
+  $('login').classList.toggle('hidden', signedIn);
+  $('app').classList.toggle('hidden', !signedIn);
+  $('refresh').classList.toggle('hidden', !signedIn);
+  $('who').textContent = '';
+  if (signedIn) { view = 'me'; run('list'); }
+}
+if (API_URL.startsWith('PASTE')) document.querySelector('main').innerHTML =
+  '<h1>Wish lists</h1><p>Not set up yet. Paste the Apps Script web app URL into <code>API_URL</code> in this file (see README.md).</p>';
+else start();
+</script>
+</body>
+</html>
