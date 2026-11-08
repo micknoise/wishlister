@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>How to use the wish lists</title>
+<style>
+  :root { --bg:#faf8f5; --card:#fff; --ink:#222; --muted:#777; --line:#e6e1da; --accent:#b4432f; --ok:#2f7d4f; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:16px/1.55 system-ui, -apple-system, Segoe UI, sans-serif; background:var(--bg); color:var(--ink); }
+  main { max-width: 760px; margin: 0 auto; padding: 20px 16px 60px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  h2 { font-size: 1.15rem; margin: 0 0 6px; }
+  a { color: var(--accent); }
+  .muted { color: var(--muted); font-size: .9rem; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:12px; }
+  .card p, .card ol, .card ul { margin: 6px 0; }
+  ol, ul { padding-left: 1.3em; }
+  li { margin: 4px 0; }
+  .btn { display:inline-block; border:1px solid var(--line); background:#fff; border-radius:8px; padding:1px 8px; font-size:.92em; white-space:nowrap; }
+  .btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .tag { font-size:.85rem; padding:1px 8px; border-radius:99px; background:#eee; white-space:nowrap; }
+  .tag.ok { background:#e3f2e8; color:var(--ok); }
+  details { border-top:1px solid var(--line); padding:8px 0; }
+  details:first-of-type { border-top:none; }
+  summary { cursor:pointer; font-weight:600; }
+  details p { margin: 6px 0 2px; }
+  .back { display:inline-block; margin-bottom:14px; }
+</style>
+</head>
+<body>
+<main>
+  <a class="back" href="./">← Back to the wish lists</a>
+  <h1>How it works</h1>
+  <p class="muted">A shared wish list for the family. Everyone keeps their own list,
+  and you can mark things you're buying for each other so nobody buys the same present twice.
+  The person whose list it is never finds out what's been bought.</p>
+
+  <div class="card">
+    <h2>1. Sign in</h2>
+    <ol>
+      <li>Type your <b>first name</b> and the <b>family code</b> (ask whoever sent you the link).</li>
+      <li>Always use <b>the same name</b>, spelled the same way. Your name <em>is</em> your list:
+        "Sam" and "Sammy" would be two different lists. Capital letters don't matter.</li>
+      <li>Your phone or computer remembers you, so you only do this once on each device.</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2>2. Add things to your list</h2>
+    <ol>
+      <li>Tap <span class="btn">My list</span>.</li>
+      <li>Find the thing you want in a shop's website, copy its link, and paste it into the box.
+        The name, price and picture usually fill in by themselves after a second or two.</li>
+      <li>Check the name and price, and add any <b>notes</b> (size, colour, "any of these", "second-hand is fine").</li>
+      <li>Tap <span class="btn primary">Add to my list</span>.</li>
+    </ol>
+    <p>No link? Just type what it is ("Bath bombs", "Book tokens") and add it.</p>
+    <p><b>On a phone with the Amazon app:</b> tap <b>Share → Copy</b> on the product, then paste the whole
+      message into the box. The page picks out the link and the product name for you.</p>
+    <p>To take something off, tap <span class="btn">Remove</span>.</p>
+  </div>
+
+  <div class="card">
+    <h2>3. Buy something for someone</h2>
+    <ol>
+      <li>Tap the person's name along the top to see their list.
+        (A name only appears once that person has added something.)</li>
+      <li>Tap the item's name to open the shop.</li>
+      <li>When you decide to get it, tap <span class="btn primary">I'll get this</span>.
+        It changes to <span class="tag ok">You're getting this</span>, and everyone else sees
+        <span class="tag">Bought by <i>your name</i></span>, so they won't buy it too.</li>
+      <li>Changed your mind? Tap <b>undo</b> to free it up again. Only you can undo your own.</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2>Keeping it a surprise</h2>
+    <p>On your own list you'll never see what's been bought or who bought it. Everyone else can see it on
+      your list, so they can avoid buying the same thing twice.</p>
+    <p>It works on trust. The family code keeps strangers out, but nothing checks names, so please only
+      sign in as yourself.</p>
+  </div>
+
+  <div class="card">
+    <h2>Questions</h2>
+    <details>
+      <summary>The name or picture didn't fill in</summary>
+      <p>Some shops (especially Amazon) block automatic look-ups. Just type the name and price yourself.
+        The link still works when people tap it. A picture is nice but not needed.</p>
+    </details>
+    <details>
+      <summary>I don't see changes someone else just made</summary>
+      <p>Tap <span class="btn">Refresh</span> at the top. The page also refreshes when you come back to it.</p>
+    </details>
+    <details>
+      <summary>I signed in with the wrong name, or I'm on a new phone</summary>
+      <p>Tap <b>not you?</b> under the title and sign in again with your usual name. Your list is still there.
+        It's saved online, not on your phone.</p>
+    </details>
+    <details>
+      <summary>Someone has two lists because of a spelling mistake</summary>
+      <p>Sign in with the spelling you want to keep and re-add the items, then remove the old ones under the
+        other spelling. Or ask whoever set this up to fix the name in the spreadsheet.</p>
+    </details>
+    <details>
+      <summary>I bought something but forgot to mark it</summary>
+      <p>Open their list and tap <span class="btn primary">I'll get this</span> now. It doesn't matter when you do it.</p>
+    </details>
+    <details>
+      <summary>What if I remove something that someone has already bought?</summary>
+      <p>It disappears for everyone, including whoever was getting it, and you won't be told it was bought.
+        It's best to leave things on your list until after the birthday or holiday.</p>
+    </details>
+    <details>
+      <summary>Where is everything kept?</summary>
+      <p>In a private Google spreadsheet belonging to whoever set this up. Only people with the family code
+        can see or change the lists through this page.</p>
+    </details>
+  </div>
+
+  <a href="./">← Back to the wish lists</a>
+</main>
+</body>
+</html>
